@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@elysia/eden": "^1.4.10",
+    "@tanstack/react-query": "^5.101.0",
+    "elysia": "^1.4.29",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
