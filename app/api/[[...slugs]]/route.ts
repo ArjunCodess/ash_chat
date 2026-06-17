@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { Elysia } from "elysia";
 
 const rooms = new Elysia({ prefix: "/rooms" }).post("/create", async ({ body }) => {
   return {
