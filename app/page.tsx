@@ -2,6 +2,7 @@
 
 import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "ashchat_username";
@@ -20,6 +21,8 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const [roomTTLSeconds, setRoomTTLSeconds] = useState(3600);
 
+  const router = useRouter();
+
   useEffect(() => {
     const main = () => {
       let storedUsername = localStorage.getItem(STORAGE_KEY);
@@ -36,7 +39,10 @@ export default function Home() {
   const { mutate: createRoom } = useMutation({
     mutationFn: async () => {
       const response = await client.rooms.create.post({ roomTTLSeconds });
-      console.log("Room created:", response);
+
+      if (response.status === 200) {
+        router.push(`/room/${response.data?.roomId}`);
+      }
     },
   });
 
@@ -74,7 +80,9 @@ export default function Home() {
                 type="number"
                 className="w-full bg-zinc-950 border border-zinc-800 p-3 text-sm text-zinc-400"
                 value={roomTTLSeconds}
-                onChange={(e) => setRoomTTLSeconds(parseInt(e.target.value) || 3600)}
+                onChange={(e) =>
+                  setRoomTTLSeconds(parseInt(e.target.value) || 3600)
+                }
                 required
               />
             </div>
