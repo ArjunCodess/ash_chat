@@ -18,6 +18,7 @@ const generateUsername = () => {
 
 export default function Home() {
   const [username, setUsername] = useState("");
+  const [roomTTLSeconds, setRoomTTLSeconds] = useState(3600);
 
   useEffect(() => {
     const main = () => {
@@ -32,9 +33,9 @@ export default function Home() {
     main();
   }, []);
 
-  const { mutate: CreateRoom } = useMutation({
+  const { mutate: createRoom } = useMutation({
     mutationFn: async () => {
-      const response = await client.rooms.create.post();
+      const response = await client.rooms.create.post({ roomTTLSeconds });
       console.log("Room created:", response);
     },
   });
@@ -64,9 +65,23 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="flex items-center text-zinc-500">
+                Time to Live (TTL) in seconds
+              </label>
+
+              <input
+                type="number"
+                className="w-full bg-zinc-950 border border-zinc-800 p-3 text-sm text-zinc-400"
+                value={roomTTLSeconds}
+                onChange={(e) => setRoomTTLSeconds(parseInt(e.target.value) || 3600)}
+                required
+              />
+            </div>
+
             <button
               className="w-full bg-zinc-100 text-black p-3 text-sm font-bold hover:bg-zinc-50 hover:text-black transition-colors mt-2 cursor-pointer disabled:opacity-50"
-              onClick={() => CreateRoom()}
+              onClick={() => createRoom()}
             >
               CREATE SECURE ROOM
             </button>
