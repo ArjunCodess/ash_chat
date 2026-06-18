@@ -3,7 +3,7 @@
 import { useUsername } from "@/hooks/use-username";
 import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function Home() {
@@ -11,6 +11,10 @@ export default function Home() {
 
   const { username } = useUsername();
   const router = useRouter();
+
+  const searchParams = useSearchParams();
+  const wasDestroyed = searchParams.get("destroyed") === "true";
+  const error = searchParams.get("error");
 
   const { mutate: createRoom } = useMutation({
     mutationFn: async () => {
@@ -25,6 +29,23 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
+        {wasDestroyed && (
+          <div className="bg-green-900/50 border border-green-800 p-4 text-green-400 text-sm">
+            The room was destroyed successfully.
+          </div>
+        )}
+
+        {error == "room_not_found" && (
+          <div className="bg-red-900/50 border border-red-800 p-4 text-red-400 text-sm">
+            The room was not found.
+          </div>
+        )}
+
+        {error == "room_full" && (
+          <div className="bg-red-900/50 border border-red-800 p-4 text-red-400 text-sm">
+            The room is already full.
+          </div>
+        )}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight text-green-500">
             ash_chat
