@@ -2,10 +2,10 @@
   <img width="750" src="https://ash-chat.vercel.app/app.png" alt="ash_chat app preview">
 </p>
 
-<h2 align="center">ash_chat - Private, Temporary Chat Rooms</h2>
+<h2 align="center">ash_chat - End-to-End Encrypted Chat Rooms</h2>
 
 <p align="center">
-  Create a temporary two-person chat room, share the room link, and let the room expire automatically. ash_chat is built around short-lived conversations, anonymous identities, HTTP-only participant tokens, Redis-backed room state, and realtime updates.
+  Create an end-to-end encrypted, self-destructing two-person chat room, share the full invite link, and let the room expire automatically. ash_chat keeps message contents encrypted in the browser while Redis stores only ciphertext, room state, participant metadata, and rate-limit counters.
 </p>
 
 ## Table of Contents
@@ -21,11 +21,11 @@
 
 ## About <a name = "about"></a>
 
-ash_chat is a lightweight chat app for private, temporary two-person rooms. A user creates a room with a time-to-live, shares the room URL with one other person, and messages are stored only until the room expires or is destroyed.
+ash_chat is a lightweight chat app for end-to-end encrypted, self-destructing two-person rooms. A user creates a room with a time-to-live, shares the full room URL with one other person, and message contents remain encrypted before they leave the browser.
 
-The app uses Redis for room state, participant membership, message storage, rate-limit counters, and room expiration. Realtime updates are delivered through Upstash Realtime, while the API layer is built with Elysia and consumed through Eden for typed client calls.
+The app uses Redis for room state, participant membership, encrypted message storage, rate-limit counters, and room expiration. Realtime updates are delivered through Upstash Realtime, while the API layer is built with Elysia and consumed through Eden for typed client calls.
 
-The current security model focuses on temporary room access and abuse resistance. Rooms validate their IDs before Redis lookups, participant access is enforced through an HTTP-only token cookie, and message/room creation endpoints have Redis-backed rate limits.
+The current security model focuses on browser-only message encryption, temporary room access, and abuse resistance. Rooms validate their IDs before Redis lookups, participant access is enforced through an HTTP-only token cookie, and message/room creation endpoints have Redis-backed rate limits.
 
 ## Getting Started <a name = "getting_started"></a>
 
@@ -71,6 +71,8 @@ Want to run ash_chat locally? Here's what you need.
 
 1. **Create Temporary Rooms**
    - Choose a room TTL in seconds
+   - A 256-bit AES-GCM room key is generated in the browser
+   - The key is shared through the URL fragment and is not sent to the server
    - Server validates TTL bounds before creating the room
    - Room state is stored in Redis with expiry
 
@@ -79,11 +81,13 @@ Want to run ash_chat locally? Here's what you need.
    - Room IDs are validated before Redis lookups
    - A room accepts up to two participants
    - Participants receive an HTTP-only token cookie
+   - The full invite link must include `#key=...` so messages can be decrypted
 
 3. **Chat in Realtime**
-   - Messages are stored in Redis while the room exists
+   - Message contents are encrypted with Web Crypto before being sent
+   - Redis stores ciphertext and IV values while the room exists
    - Upstash Realtime notifies connected clients
-   - The UI refreshes messages when realtime events arrive
+   - The UI refreshes messages when realtime events arrive and decrypts locally
 
 4. **Destroy or Expire**
    - A participant can destroy the room manually
@@ -120,10 +124,11 @@ Want to run ash_chat locally? Here's what you need.
 - **Eden** for typed client calls
 - **Upstash Realtime** for room events
 - **Zod** for shared runtime schemas
+- **Web Crypto API** for AES-GCM message encryption
 
 ### Storage
 
-- **Upstash Redis** for rooms, messages, participant lists, TTLs, and rate-limit counters
+- **Upstash Redis** for rooms, encrypted messages, participant lists, TTLs, and rate-limit counters
 
 ### Development Tools
 
@@ -165,12 +170,15 @@ This app can deploy to any Node-compatible Next.js host.
 
 - Room existence and access
 - Participant token cookies
-- Message contents stored in Redis
+- Browser-held room encryption keys
+- Encrypted message contents stored in Redis
 - Redis credentials
 
 ### Primary Controls
 
 - HTTP-only participant token cookie
+- AES-GCM message encryption in the browser
+- URL-fragment room keys that are not sent to the server
 - Two-participant room cap
 - Room TTL expiration
 - Server-side room ID validation
@@ -179,14 +187,14 @@ This app can deploy to any Node-compatible Next.js host.
 
 ### Known Limitations
 
-- Messages are currently stored server-side in plaintext. This is not true end-to-end encryption yet.
+- Message contents are end-to-end encrypted, but metadata such as room ID, sender label, timestamp, participant token, and rate-limit counters remains server-visible.
 - Participant names are client-provided and should not be treated as trusted identity.
 - Anyone with a valid room URL can join before the room reaches the participant cap.
+- Anyone with the full URL fragment key can decrypt room messages.
 - Participant joins should eventually become atomic to avoid race conditions at the two-user boundary.
 
 ### Future Hardening
 
-- Client-side encryption with room keys kept out of Redis
 - Atomic participant joins
 - Stronger trusted-proxy handling for client IP rate limits
 - Security headers and CSP
@@ -194,7 +202,7 @@ This app can deploy to any Node-compatible Next.js host.
 
 ## Author <a name = "authors"></a>
 
-Built by the ash_chat project author.
+**Arjun Vijay Prakash** / **ArjunCodess**
 
 ## Acknowledgments <a name = "acknowledgement"></a>
 
@@ -208,6 +216,6 @@ Built by the ash_chat project author.
 
 <div align="center">
 
-**ash_chat** - Temporary rooms for short-lived conversations.
+**ash_chat** - End-to-end encrypted, self-destructing chat rooms.
 
 </div>
