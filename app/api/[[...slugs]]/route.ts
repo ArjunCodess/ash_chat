@@ -3,29 +3,39 @@ import { Elysia, t } from "elysia";
 import { authMiddleware } from "./auth";
 import { Message, realtime } from "@/lib/realtime";
 
-const rooms = new Elysia({ prefix: "/rooms" }).post(
-  "/create",
-  async ({ body }) => {
-    const roomId = Math.random().toString(36).substring(2, 15);
+const rooms = new Elysia({ prefix: "/rooms" })
+  .post(
+    "/create",
+    async ({ body }) => {
+      const roomId = Math.random().toString(36).substring(2, 15);
 
-    await redis.hset(`room:${roomId}`, {
-      createdAt: Date.now(),
-      participants: [],
-    });
+      await redis.hset(`room:${roomId}`, {
+        createdAt: Date.now(),
+        participants: [],
+      });
 
-    await redis.expire(`room:${roomId}`, body.roomTTLSeconds);
+      await redis.expire(`room:${roomId}`, body.roomTTLSeconds);
 
-    return {
-      message: "Room created successfully",
-      roomId,
-    };
-  },
-  {
-    body: t.Object({
-      roomTTLSeconds: t.Number(),
-    }),
-  },
-);
+      return {
+        message: "Room created successfully",
+        roomId,
+      };
+    },
+    {
+      body: t.Object({
+        roomTTLSeconds: t.Number(),
+      }),
+    },
+  )
+  .use(authMiddleware)
+  .get(
+    "/ttl",
+    async ({ auth }) => {
+      const ttl = await redis.ttl(`room:${auth.roomId}`);
+      return { ttl: ttl > 0 ? ttl : 0 };
+    },
+    { query: t.Object({ roomId: t.String() }) },
+  );
 
 const messages = new Elysia({ prefix: "/messages" })
   .use(authMiddleware)
