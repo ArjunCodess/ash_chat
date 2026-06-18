@@ -4,9 +4,17 @@ import { useUsername } from "@/hooks/use-username";
 import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 export default function Home() {
+  return (
+    <Suspense>
+      <Lobby />
+    </Suspense>
+  );
+}
+
+function Lobby() {
   const [roomTTLSeconds, setRoomTTLSeconds] = useState(3600);
 
   const { username } = useUsername();
