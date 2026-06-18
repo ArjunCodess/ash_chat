@@ -2,6 +2,12 @@
 
 import { useUsername } from "@/hooks/use-username";
 import { client } from "@/lib/client";
+import {
+  decryptMessageText,
+  encryptMessageText,
+  importRoomKey,
+  readRoomKeyFromHash,
+} from "@/lib/crypto";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRealtime } from "@upstash/realtime/client";
 import { format } from "date-fns";
@@ -24,6 +30,71 @@ const formatTimeRemaining = (time: number) => {
   return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 };
 
+type EncryptedMessage = {
+  ciphertext: string;
+  id: string;
+  iv: string;
+  roomId: string;
+  sender: string;
+  timestamp: number;
+};
+
+function MessageItem({
+  message,
+  roomId,
+  roomKey,
+  username,
+}: {
+  message: EncryptedMessage;
+  roomId: string;
+  roomKey: CryptoKey;
+  username: string;
+}) {
+  const [decryptedText, setDecryptedText] = useState("Decrypting...");
+
+  useEffect(() => {
+    let isActive = true;
+
+    decryptMessageText({
+      ciphertext: message.ciphertext,
+      iv: message.iv,
+      key: roomKey,
+      roomId,
+    })
+      .then((text) => {
+        if (isActive) setDecryptedText(text);
+      })
+      .catch(() => {
+        if (isActive) setDecryptedText("Unable to decrypt message");
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [message.ciphertext, message.iv, roomId, roomKey]);
+
+  return (
+    <div className="flex flex-col items-start">
+      <div className="max-w-[80%] group">
+        <div className="flex items-baseline gap-3 mb-1">
+          <span
+            className={`text-sm font-bold ${message.sender === username ? "text-green-500" : "text-zinc-500"}`}
+          >
+            {message.sender === username ? "YOU" : message.sender}
+          </span>
+          <span className="text-xs text-zinc-500">
+            {format(message.timestamp, "hh:mm a")}
+          </span>
+        </div>
+
+        <p className="text-zinc-200 text-base leading-relaxed break-all">
+          {decryptedText}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Room() {
   const params = useParams();
   const router = useRouter();
@@ -33,9 +104,48 @@ export default function Room() {
 
   const [message, setMessage] = useState<string>("");
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+  const [keyStatus, setKeyStatus] = useState<
+    "invalid" | "loading" | "missing" | "ready"
+  >("loading");
   const [now, setNow] = useState(() => Date.now());
+  const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadRoomKey = async () => {
+      const encodedKey = readRoomKeyFromHash();
+
+      if (!encodedKey) {
+        setRoomKey(null);
+        setKeyStatus("missing");
+        return;
+      }
+
+      try {
+        const importedKey = await importRoomKey(encodedKey);
+        if (!isActive) return;
+
+        setRoomKey(importedKey);
+        setKeyStatus("ready");
+      } catch {
+        if (!isActive) return;
+
+        setRoomKey(null);
+        setKeyStatus("invalid");
+      }
+    };
+
+    loadRoomKey();
+    window.addEventListener("hashchange", loadRoomKey);
+
+    return () => {
+      isActive = false;
+      window.removeEventListener("hashchange", loadRoomKey);
+    };
+  }, []);
 
   const { data: ttlData, dataUpdatedAt: ttlUpdatedAt } = useQuery({
     queryKey: ["ttl", roomId],
@@ -80,10 +190,20 @@ export default function Room() {
     error: sendMessageError,
   } = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
+      if (!roomKey) {
+        throw new Error("This room link is missing its encryption key.");
+      }
+
+      const encryptedMessage = await encryptMessageText({
+        key: roomKey,
+        roomId,
+        text,
+      });
+
       const response = await client.messages.post(
         {
+          ...encryptedMessage,
           sender: username,
-          text,
         },
         { query: { roomId } },
       );
@@ -120,7 +240,7 @@ export default function Room() {
   });
 
   const handleSendMessage = () => {
-    if (message.trim() === "" || isSendingMessage) return;
+    if (message.trim() === "" || isSendingMessage || !roomKey) return;
     sendMessage({ text: message });
   };
 
@@ -135,6 +255,28 @@ export default function Room() {
       }
     },
   });
+
+  if (keyStatus !== "ready" || !roomKey) {
+    const message =
+      keyStatus === "invalid"
+        ? "This room link has an invalid encryption key."
+        : keyStatus === "missing"
+          ? "This room link is missing its encryption key."
+          : "Loading room encryption key...";
+
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
+        <div className="w-full max-w-md border border-zinc-800 bg-zinc-900/50 p-6">
+          <h1 className="text-xl font-bold text-green-500">ash_chat</h1>
+          <p className="mt-3 text-sm text-zinc-400">{message}</p>
+          <p className="mt-3 text-xs text-zinc-600">
+            Ask the room creator to send the full invite link, including the
+            part after #.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex flex-col h-screen max-h-screen overflow-hidden">
@@ -197,24 +339,13 @@ export default function Room() {
           </p>
         ) : (
           messages?.messages.map((msg) => (
-            <div key={msg.id} className="flex flex-col items-start">
-              <div className="max-w-[80%] group">
-                <div className="flex items-baseline gap-3 mb-1">
-                  <span
-                    className={`text-sm font-bold ${msg.sender === username ? "text-green-500" : "text-zinc-500"}`}
-                  >
-                    {msg.sender === username ? "YOU" : msg.sender}
-                  </span>
-                  <span className="text-xs text-zinc-500">
-                    {format(msg.timestamp, "hh:mm a")}
-                  </span>
-                </div>
-
-                <p className="text-zinc-200 text-base leading-relaxed break-all">
-                  {msg.text}
-                </p>
-              </div>
-            </div>
+            <MessageItem
+              key={msg.id}
+              message={msg}
+              roomId={roomId}
+              roomKey={roomKey}
+              username={username}
+            />
           ))
         )}
       </div>
@@ -242,7 +373,7 @@ export default function Room() {
             <button
               type="button"
               onClick={handleSendMessage}
-              disabled={message.trim() === "" || isSendingMessage}
+              disabled={message.trim() === "" || isSendingMessage || !roomKey}
               className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white px-6 py-2 transition-colors uppercase cursor-pointer"
             >
               {isSendingMessage ? "Sending" : "Send"}

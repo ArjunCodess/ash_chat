@@ -2,6 +2,7 @@
 
 import { useUsername } from "@/hooks/use-username";
 import { client } from "@/lib/client";
+import { exportRoomKey, generateRoomKey } from "@/lib/crypto";
 import {
   MAX_ROOM_TTL_SECONDS,
   MIN_ROOM_TTL_SECONDS,
@@ -54,7 +55,9 @@ function Lobby() {
     },
     onSuccess: async ({ roomId }) => {
       await queryClient.invalidateQueries({ queryKey: ["rooms"] });
-      router.push(`/room/${roomId}`);
+      const roomKey = await generateRoomKey();
+      const encodedKey = await exportRoomKey(roomKey);
+      router.push(`/room/${roomId}#key=${encodedKey}`);
     },
   });
 
@@ -83,7 +86,7 @@ function Lobby() {
             ash_chat
           </h1>
           <p className="text-zinc-500 text-sm text-balance">
-            a private, end-to-end encrypted, self-destructing chat app.
+            end-to-end encrypted, self-destructing chat rooms.
           </p>
         </div>
         <div className="border border-zinc-800 bg-zinc-900/50 p-6 backdrop-blur-md">
