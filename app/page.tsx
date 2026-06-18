@@ -1,40 +1,16 @@
 "use client";
 
+import { useUsername } from "@/hooks/use-username";
 import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-
-const STORAGE_KEY = "ashchat_username";
-
-const generateUsername = () => {
-  const adjectives = ["Swift", "Silent", "Brave", "Clever", "Mighty"];
-  const nouns = ["Tiger", "Eagle", "Shark", "Panther", "Wolf"];
-
-  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-
-  return `${adjective}${noun}`;
-};
+import { useState } from "react";
 
 export default function Home() {
-  const [username, setUsername] = useState("");
   const [roomTTLSeconds, setRoomTTLSeconds] = useState(3600);
 
+  const { username } = useUsername();
   const router = useRouter();
-
-  useEffect(() => {
-    const main = () => {
-      let storedUsername = localStorage.getItem(STORAGE_KEY);
-      if (!storedUsername) {
-        storedUsername = generateUsername();
-        localStorage.setItem(STORAGE_KEY, storedUsername);
-      }
-      setUsername(storedUsername);
-    };
-
-    main();
-  }, []);
 
   const { mutate: createRoom } = useMutation({
     mutationFn: async () => {

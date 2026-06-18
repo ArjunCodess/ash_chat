@@ -1,10 +1,14 @@
 "use client";
 
+import { useUsername } from "@/hooks/use-username";
+import { client } from "@/lib/client";
+import { useMutation } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useRef, useState } from "react";
 
 export default function Room() {
   const params = useParams();
+  const { username } = useUsername();
   const roomId = params.roomId as string;
 
   const [message, setMessage] = useState<string>("");
@@ -30,6 +34,18 @@ export default function Room() {
     const seconds = time % 60;
     return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
+
+  const { mutate: sendMessage, isPending } = useMutation({
+    mutationFn: async ({ text }: { text: string }) => {
+      await client.messages.post(
+        {
+          sender: username,
+          text,
+        },
+        { query: { roomId } },
+      );
+    },
+  });
 
   return (
     <main className="flex flex-col h-screen max-h-screen overflow-hidden">
@@ -87,13 +103,22 @@ export default function Room() {
               ref={inputRef}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && message.trim() !== "") {
+                  sendMessage({ text: message });
                   inputRef.current?.focus();
                   setMessage("");
                 }
               }}
               className="border border-zinc-800 w-full bg-zinc-900 p-4 pl-10 text-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
-            <button className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white px-6 py-2 transition-colors uppercase cursor-pointer">
+            <button
+              onClick={() => {
+                sendMessage({ text: message });
+                inputRef.current?.focus();
+                setMessage("");
+              }}
+              disabled={message.trim() === "" || isPending}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white px-6 py-2 transition-colors uppercase cursor-pointer"
+            >
               Send
             </button>
           </div>
