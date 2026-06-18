@@ -2,12 +2,37 @@ import { redis } from "@/lib/redis";
 import { Elysia, t } from "elysia";
 import { authMiddleware } from "./auth";
 import { Message, realtime } from "@/lib/realtime";
+import { nanoid } from "nanoid";
+
+const MIN_ROOM_TTL_SECONDS = 60;
+const MAX_ROOM_TTL_SECONDS = 24 * 60 * 60;
+
+class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BadRequestError";
+  }
+}
+
+const validateRoomTTL = (roomTTLSeconds: number) => {
+  if (
+    !Number.isInteger(roomTTLSeconds) ||
+    roomTTLSeconds < MIN_ROOM_TTL_SECONDS ||
+    roomTTLSeconds > MAX_ROOM_TTL_SECONDS
+  ) {
+    throw new BadRequestError(
+      `Room TTL must be an integer between ${MIN_ROOM_TTL_SECONDS} and ${MAX_ROOM_TTL_SECONDS} seconds.`,
+    );
+  }
+};
 
 const rooms = new Elysia({ prefix: "/rooms" })
   .post(
     "/create",
     async ({ body }) => {
-      const roomId = Math.random().toString(36).substring(2, 15);
+      validateRoomTTL(body.roomTTLSeconds);
+
+      const roomId = nanoid(16);
 
       await redis.hset(`room:${roomId}`, {
         createdAt: Date.now(),
@@ -23,7 +48,10 @@ const rooms = new Elysia({ prefix: "/rooms" })
     },
     {
       body: t.Object({
-        roomTTLSeconds: t.Number(),
+        roomTTLSeconds: t.Number({
+          minimum: MIN_ROOM_TTL_SECONDS,
+          maximum: MAX_ROOM_TTL_SECONDS,
+        }),
       }),
     },
   )
@@ -118,6 +146,13 @@ const messages = new Elysia({ prefix: "/messages" })
   );
 
 export const app = new Elysia({ prefix: "/api" })
+  .error({ BadRequestError })
+  .onError(({ code, error, set }) => {
+    if (code === "BadRequestError") {
+      set.status = 400;
+      return { error: error.message };
+    }
+  })
   .use(rooms)
   .use(messages)
   .get("/", async () => {

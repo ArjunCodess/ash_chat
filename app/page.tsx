@@ -6,6 +6,10 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+const MIN_ROOM_TTL_SECONDS = 60;
+const DEFAULT_ROOM_TTL_SECONDS = 3600;
+const MAX_ROOM_TTL_SECONDS = 24 * 60 * 60;
+
 export default function Home() {
   return (
     <Suspense>
@@ -15,7 +19,9 @@ export default function Home() {
 }
 
 function Lobby() {
-  const [roomTTLSeconds, setRoomTTLSeconds] = useState(3600);
+  const [roomTTLSeconds, setRoomTTLSeconds] = useState(
+    DEFAULT_ROOM_TTL_SECONDS,
+  );
 
   const { username } = useUsername();
   const router = useRouter();
@@ -83,10 +89,15 @@ function Lobby() {
 
               <input
                 type="number"
+                min={MIN_ROOM_TTL_SECONDS}
+                max={MAX_ROOM_TTL_SECONDS}
+                step={60}
                 className="w-full bg-zinc-950 border border-zinc-800 p-3 text-sm text-zinc-400"
                 value={roomTTLSeconds}
                 onChange={(e) =>
-                  setRoomTTLSeconds(parseInt(e.target.value) || 3600)
+                  setRoomTTLSeconds(
+                    Number.parseInt(e.target.value) || DEFAULT_ROOM_TTL_SECONDS,
+                  )
                 }
                 required
               />
