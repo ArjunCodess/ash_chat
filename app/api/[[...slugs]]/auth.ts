@@ -1,4 +1,5 @@
 import { redis } from "@/lib/redis";
+import { roomIdSchema } from "@/lib/schema";
 import Elysia from "elysia";
 
 class AuthError extends Error {
@@ -22,6 +23,10 @@ export const authMiddleware = new Elysia({ name: "auth" })
 
     if (!roomId || !token) {
       throw new AuthError("Missing roomId or token");
+    }
+
+    if (!roomIdSchema.safeParse(roomId).success) {
+      throw new AuthError("Invalid roomId");
     }
 
     const participants = await redis.hget<string[]>(

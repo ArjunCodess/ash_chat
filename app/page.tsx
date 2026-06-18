@@ -2,13 +2,15 @@
 
 import { useUsername } from "@/hooks/use-username";
 import { client } from "@/lib/client";
-import { useMutation } from "@tanstack/react-query";
+import {
+  MAX_ROOM_TTL_SECONDS,
+  MIN_ROOM_TTL_SECONDS,
+} from "@/lib/schema";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
-const MIN_ROOM_TTL_SECONDS = 60;
 const DEFAULT_ROOM_TTL_SECONDS = 3600;
-const MAX_ROOM_TTL_SECONDS = 24 * 60 * 60;
 
 type ApiErrorResponse = {
   error?: string;
@@ -28,6 +30,7 @@ function Lobby() {
   );
 
   const { username } = useUsername();
+  const queryClient = useQueryClient();
   const router = useRouter();
 
   const searchParams = useSearchParams();
@@ -49,7 +52,8 @@ function Lobby() {
 
       return response.data;
     },
-    onSuccess: ({ roomId }) => {
+    onSuccess: async ({ roomId }) => {
+      await queryClient.invalidateQueries({ queryKey: ["rooms"] });
       router.push(`/room/${roomId}`);
     },
   });
@@ -85,9 +89,9 @@ function Lobby() {
         <div className="border border-zinc-800 bg-zinc-900/50 p-6 backdrop-blur-md">
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="flex items-center text-zinc-500">
+              <span className="flex items-center text-zinc-500">
                 Your Identity
-              </label>
+              </span>
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-zinc-950 border border-zinc-800 p-3 text-sm text-zinc-400">
@@ -97,11 +101,15 @@ function Lobby() {
             </div>
 
             <div className="space-y-2">
-              <label className="flex items-center text-zinc-500">
+              <label
+                htmlFor="room-ttl-seconds"
+                className="flex items-center text-zinc-500"
+              >
                 Time to Live (TTL) in seconds
               </label>
 
               <input
+                id="room-ttl-seconds"
                 type="number"
                 min={MIN_ROOM_TTL_SECONDS}
                 max={MAX_ROOM_TTL_SECONDS}
@@ -124,6 +132,7 @@ function Lobby() {
             )}
 
             <button
+              type="button"
               className="w-full bg-zinc-100 text-black p-3 text-sm font-bold hover:bg-zinc-50 hover:text-black transition-colors mt-2 cursor-pointer disabled:opacity-50"
               onClick={() => createRoom()}
               disabled={isCreatingRoom}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis } from "./lib/redis";
 import { nanoid } from "nanoid";
+import { MAX_ROOM_PARTICIPANTS, roomIdSchema } from "./lib/schema";
 
 export const proxy = async (req: NextRequest) => {
   const pathname = req.nextUrl.pathname;
@@ -9,6 +10,10 @@ export const proxy = async (req: NextRequest) => {
   if (!roomMatch) return NextResponse.redirect(new URL("/", req.url));
 
   const roomId = roomMatch[1];
+  if (!roomIdSchema.safeParse(roomId).success) {
+    return NextResponse.redirect(new URL("/?error=room_not_found", req.url));
+  }
+
   const room = await redis.hgetall<{ participants: string[]; createdAt: Date }>(
     `room:${roomId}`,
   );
@@ -19,7 +24,7 @@ export const proxy = async (req: NextRequest) => {
     return NextResponse.next();
   }
   
-  if (room.participants.length >= 2) {
+  if (room.participants.length >= MAX_ROOM_PARTICIPANTS) {
     return NextResponse.redirect(new URL("/?error=room_full", req.url));
   }
 
