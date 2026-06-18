@@ -35,6 +35,21 @@ const rooms = new Elysia({ prefix: "/rooms" })
       return { ttl: ttl > 0 ? ttl : 0 };
     },
     { query: t.Object({ roomId: t.String() }) },
+  )
+  .delete(
+    "/",
+    async ({ auth }) => {
+      await realtime
+        .channel(auth.roomId)
+        .emit("chat.destroy", { isDestroyed: true });
+
+      await Promise.all([
+        redis.del(auth.roomId),
+        redis.del(`room:${auth.roomId}`),
+        redis.del(`messages:${auth.roomId}`),
+      ]);
+    },
+    { query: t.Object({ roomId: t.String() }) },
   );
 
 const messages = new Elysia({ prefix: "/messages" })
@@ -65,7 +80,6 @@ const messages = new Elysia({ prefix: "/messages" })
       const remaining = await redis.ttl(`room:${roomId}`);
 
       await redis.expire(`messages:${roomId}`, remaining);
-      await redis.expire(`history:${roomId}`, remaining);
       await redis.expire(roomId, remaining);
 
       return { message: "Message sent successfully" };
@@ -114,3 +128,4 @@ export const app = new Elysia({ prefix: "/api" })
 
 export const GET = app.fetch;
 export const POST = app.fetch;
+export const DELETE = app.fetch;
