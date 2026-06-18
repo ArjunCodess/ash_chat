@@ -5,7 +5,8 @@ import { Message, realtime } from "@/lib/realtime";
 import { nanoid } from "nanoid";
 import {
   createRoomBodySchema,
-  MAX_MESSAGE_TEXT_LENGTH,
+  MAX_CIPHERTEXT_LENGTH,
+  MAX_IV_LENGTH,
   MAX_MESSAGES_PER_ROOM,
   MAX_ROOM_TTL_SECONDS,
   MAX_SENDER_LENGTH,
@@ -150,7 +151,7 @@ const messages = new Elysia({ prefix: "/messages" })
         windowSeconds: 60 * 60,
       });
 
-      const { sender, text } = parsedBody.data;
+      const { sender, ciphertext, iv } = parsedBody.data;
       const { roomId } = auth;
 
       const roomExists = await redis.exists(`room:${roomId}`);
@@ -164,7 +165,8 @@ const messages = new Elysia({ prefix: "/messages" })
       const message: Message = {
         id: nanoid(16),
         sender,
-        text,
+        ciphertext,
+        iv,
         timestamp: Date.now(),
         roomId,
       };
@@ -188,7 +190,11 @@ const messages = new Elysia({ prefix: "/messages" })
       }),
       body: t.Object({
         sender: t.String({ minLength: 1, maxLength: MAX_SENDER_LENGTH }),
-        text: t.String({ minLength: 1, maxLength: MAX_MESSAGE_TEXT_LENGTH }),
+        ciphertext: t.String({
+          minLength: 1,
+          maxLength: MAX_CIPHERTEXT_LENGTH,
+        }),
+        iv: t.String({ minLength: 1, maxLength: MAX_IV_LENGTH }),
       }),
     },
   )
