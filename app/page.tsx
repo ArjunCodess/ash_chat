@@ -10,6 +10,10 @@ const MIN_ROOM_TTL_SECONDS = 60;
 const DEFAULT_ROOM_TTL_SECONDS = 3600;
 const MAX_ROOM_TTL_SECONDS = 24 * 60 * 60;
 
+type ApiErrorResponse = {
+  error?: string;
+};
+
 export default function Home() {
   return (
     <Suspense>
@@ -30,13 +34,23 @@ function Lobby() {
   const wasDestroyed = searchParams.get("destroyed") === "true";
   const error = searchParams.get("error");
 
-  const { mutate: createRoom } = useMutation({
+  const {
+    mutate: createRoom,
+    isPending: isCreatingRoom,
+    error: createRoomError,
+  } = useMutation({
     mutationFn: async () => {
       const response = await client.rooms.create.post({ roomTTLSeconds });
 
-      if (response.status === 200) {
-        router.push(`/room/${response.data?.roomId}`);
+      if (response.status !== 200 || !response.data) {
+        const error = response.data as ApiErrorResponse | null;
+        throw new Error(error?.error ?? "Could not create room.");
       }
+
+      return response.data;
+    },
+    onSuccess: ({ roomId }) => {
+      router.push(`/room/${roomId}`);
     },
   });
 
@@ -103,11 +117,18 @@ function Lobby() {
               />
             </div>
 
+            {createRoomError && (
+              <p className="text-sm text-red-400">
+                {createRoomError.message}
+              </p>
+            )}
+
             <button
               className="w-full bg-zinc-100 text-black p-3 text-sm font-bold hover:bg-zinc-50 hover:text-black transition-colors mt-2 cursor-pointer disabled:opacity-50"
               onClick={() => createRoom()}
+              disabled={isCreatingRoom}
             >
-              CREATE SECURE ROOM
+              {isCreatingRoom ? "CREATING ROOM..." : "CREATE SECURE ROOM"}
             </button>
           </div>
         </div>

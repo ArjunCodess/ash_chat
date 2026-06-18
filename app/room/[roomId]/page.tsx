@@ -79,23 +79,48 @@ export default function Room() {
     },
   });
 
-  const { mutate: sendMessage, isPending } = useMutation({
+  const {
+    mutate: sendMessage,
+    isPending: isSendingMessage,
+    error: sendMessageError,
+  } = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
-      await client.messages.post(
+      const response = await client.messages.post(
         {
           sender: username,
           text,
         },
         { query: { roomId } },
       );
+
+      if (response.status !== 200) {
+        throw new Error("Message was not sent.");
+      }
+    },
+    onSuccess: () => {
+      inputRef.current?.focus();
+      setMessage("");
     },
   });
 
-  const { mutate: destroyRoom } = useMutation({
+  const {
+    mutate: destroyRoom,
+    isPending: isDestroyingRoom,
+    error: destroyRoomError,
+  } = useMutation({
     mutationFn: async () => {
-      await client.rooms.delete(null, { query: { roomId } });
+      const response = await client.rooms.delete(null, { query: { roomId } });
+
+      if (response.status !== 200) {
+        throw new Error("Room was not destroyed.");
+      }
     },
   });
+
+  const handleSendMessage = () => {
+    if (message.trim() === "" || isSendingMessage) return;
+    sendMessage({ text: message });
+  };
 
   useRealtime({
     channels: [roomId],
@@ -144,12 +169,22 @@ export default function Room() {
           </div>
         </div>
 
-        <button onClick={() => destroyRoom()} className="cursor-pointer bg-zinc-800 hover:bg-red-600 px-3 py-1.5 rounded text-zinc-400 hover:text-white font-bold transition-all group flex items-center gap-2 disabled:opacity-50 uppercase">
-          Destroy Room
+        <button
+          onClick={() => destroyRoom()}
+          disabled={isDestroyingRoom}
+          className="cursor-pointer bg-zinc-800 hover:bg-red-600 px-3 py-1.5 rounded text-zinc-400 hover:text-white font-bold transition-all group flex items-center gap-2 disabled:opacity-50 uppercase"
+        >
+          {isDestroyingRoom ? "Destroying..." : "Destroy Room"}
         </button>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+        {destroyRoomError && (
+          <p className="text-red-400 text-sm text-center">
+            {destroyRoomError.message}
+          </p>
+        )}
+
         {messages?.messages.length === 0 ? (
           <p className="text-zinc-500 text-center flex justify-center items-center h-full">
             No messages in this room yet.
@@ -193,26 +228,26 @@ export default function Room() {
               ref={inputRef}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && message.trim() !== "") {
-                  sendMessage({ text: message });
-                  inputRef.current?.focus();
-                  setMessage("");
+                  handleSendMessage();
                 }
               }}
               className="border border-zinc-800 w-full bg-zinc-900 p-4 pl-10 text-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
             <button
-              onClick={() => {
-                sendMessage({ text: message });
-                inputRef.current?.focus();
-                setMessage("");
-              }}
-              disabled={message.trim() === "" || isPending}
+              onClick={handleSendMessage}
+              disabled={message.trim() === "" || isSendingMessage}
               className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-500 hover:bg-green-600 text-white px-6 py-2 transition-colors uppercase cursor-pointer"
             >
-              Send
+              {isSendingMessage ? "Sending" : "Send"}
             </button>
           </div>
         </div>
+
+        {sendMessageError && (
+          <p className="mt-2 text-sm text-red-400">
+            {sendMessageError.message}
+          </p>
+        )}
       </div>
     </main>
   );
