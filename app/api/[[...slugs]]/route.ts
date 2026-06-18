@@ -64,7 +64,7 @@ const messages = new Elysia({ prefix: "/messages" })
       if (!roomExists) return { error: "Room does not exist" };
 
       const message: Message = {
-        id: Math.random().toString(36).substring(2, 15),
+        id: nanoid(16),
         sender,
         text,
         timestamp: Date.now(),

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { redis } from "./lib/redis";
+import { nanoid } from "nanoid";
 
 export const proxy = async (req: NextRequest) => {
   const pathname = req.nextUrl.pathname;
@@ -23,7 +24,7 @@ export const proxy = async (req: NextRequest) => {
   }
 
   const response = NextResponse.next();
-  const token = Math.random().toString(36).substring(2);
+  const token = nanoid(48);
   response.cookies.set("x-auth-token", token, { path: "/", httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict" });
 
   await redis.hset(`room:${roomId}`, {
