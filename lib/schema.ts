@@ -8,6 +8,8 @@ export const MAX_ROOM_PARTICIPANTS = 2;
 export const MAX_MESSAGES_PER_ROOM = 500;
 export const MAX_SENDER_LENGTH = 100;
 export const MAX_MESSAGE_TEXT_LENGTH = 500;
+export const MAX_CIPHERTEXT_LENGTH = 2048;
+export const MAX_IV_LENGTH = 64;
 
 export const roomIdSchema = z
   .string()
@@ -23,13 +25,15 @@ export const createRoomBodySchema = z.object({
 
 export const messageBodySchema = z.object({
   sender: z.string().trim().min(1).max(MAX_SENDER_LENGTH),
-  text: z.string().trim().min(1).max(MAX_MESSAGE_TEXT_LENGTH),
+  ciphertext: z.string().min(1).max(MAX_CIPHERTEXT_LENGTH),
+  iv: z.string().min(1).max(MAX_IV_LENGTH),
 });
 
 export const messageSchema = z.object({
   id: z.string().max(100),
   sender: z.string().max(MAX_SENDER_LENGTH),
-  text: z.string().max(MAX_MESSAGE_TEXT_LENGTH),
+  ciphertext: z.string().max(MAX_CIPHERTEXT_LENGTH),
+  iv: z.string().max(MAX_IV_LENGTH),
   timestamp: z.number(),
   roomId: roomIdSchema,
   token: z.string().max(100).optional(),
