@@ -8,8 +8,8 @@ import {
   importRoomKey,
   readRoomKeyFromHash,
 } from "@/lib/crypto";
+import { useRealtime } from "@/lib/realtime-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRealtime } from "@upstash/realtime/client";
 import { format } from "date-fns";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -37,20 +37,20 @@ type EncryptedMessage = {
   roomId: string;
   sender: string;
   timestamp: number;
+  token?: string;
 };
 
 function MessageItem({
   message,
   roomId,
   roomKey,
-  username,
 }: {
   message: EncryptedMessage;
   roomId: string;
   roomKey: CryptoKey;
-  username: string;
 }) {
   const [decryptedText, setDecryptedText] = useState("Decrypting...");
+  const isOwnMessage = message.token !== undefined;
 
   useEffect(() => {
     let isActive = true;
@@ -78,9 +78,9 @@ function MessageItem({
       <div className="max-w-[80%] group">
         <div className="flex items-baseline gap-3 mb-1">
           <span
-            className={`text-sm font-bold ${message.sender === username ? "text-green-500" : "text-zinc-500"}`}
+            className={`text-sm font-bold ${isOwnMessage ? "text-green-500" : "text-zinc-500"}`}
           >
-            {message.sender === username ? "YOU" : message.sender}
+            {isOwnMessage ? "YOU" : message.sender}
           </span>
           <span className="text-xs text-zinc-500">
             {format(message.timestamp, "hh:mm a")}
@@ -182,6 +182,7 @@ export default function Room() {
       const response = await client.messages.get({ query: { roomId } });
       return response.data;
     },
+    refetchInterval: 2000,
   });
 
   const {
@@ -247,8 +248,19 @@ export default function Room() {
   useRealtime({
     channels: [roomId],
     events: ["chat.message", "chat.destroy"],
-    onData: ({ event }) => {
+    onData: ({ data, event }) => {
       if (event == "chat.message") {
+        const incomingMessage = { ...data, token: undefined };
+
+        queryClient.setQueryData<typeof messages>(["messages", roomId], (current) => {
+          if (!current) return { messages: [incomingMessage] };
+          if (current.messages.some((msg) => msg.id === incomingMessage.id)) return current;
+
+          return {
+            ...current,
+            messages: [...current.messages, incomingMessage],
+          };
+        });
         refetch();
       } else if (event == "chat.destroy") {
         router.push("/?destroyed=true");
@@ -344,7 +356,6 @@ export default function Room() {
               message={msg}
               roomId={roomId}
               roomKey={roomKey}
-              username={username}
             />
           ))
         )}
